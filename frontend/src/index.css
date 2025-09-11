@@ -1,0 +1,10 @@
+html,body,#root {
+    height: 100%;
+    margin: 0;
+    font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.row-unassigned { background: rgba(255,0,0,0.06); }
+.row-low-near-due { background: rgba(255,200,0,0.06); }
+
+.container { padding: 16px; }

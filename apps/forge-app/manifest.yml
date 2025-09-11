@@ -1,0 +1,35 @@
+##  Этот manifest.yml необходим, если ты захочешь деплоить приложение в Forge.
+##  В remotes.baseUrl укажешь публичный URL бэкенда (например ngrok URL) перед forge deploy/forge install.
+##  Поле resources указывает путь на скомпилированную сборку фронтенда (frontend → build → apps/forge-app/resources/static/main).
+
+modules:
+  jira:projectPage:
+    - key: project-assistant-ui
+      title: Project Assistant
+      resource: main
+  function:
+    - key: resolver
+      handler: index.run
+  webtrigger:
+    - key: backend
+      function: resolver
+
+resources:
+  - key: main
+    path: /resources/static/main/ # React билд
+    tunnel:
+      port: 3000 # чтобы в dev можно было крутить локально
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - manage:jira-project
+remotes:
+  - key: my-remote
+    baseUrl: https://bf2e514acca5.ngrok-free.app #https://backend:4000
+
+app:
+  id: ari:cloud:ecosystem::app/cb1115e6-656c-48c7-a07e-0a12d4b3f332
+  runtime:
+    name: nodejs22.x

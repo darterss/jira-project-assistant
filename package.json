@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@forge/resolver": "^1.7.0",
+    "axios": "^1.11.0"
+  }
+}

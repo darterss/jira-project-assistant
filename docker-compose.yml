@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  backend:
+    build: ./remote-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - JIRA_BASE_URL=${JIRA_BASE_URL}
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - FORGE_APP_ID=${FORGE_APP_ID}
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
