@@ -1,33 +1,25 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { api } from '../api';
+import { api } from '../API/api';
+import { JiraUser, JiraIssue, JiraProject } from '../types/types';
 
-export type JiraUser = { accountId: string; displayName?: string | null };
-export type JiraPriority = { name?: string };
-export type JiraStatus = { name?: string };
+const isJiraProject = (item: any): item is JiraProject =>
+    !!item && typeof item.id === 'string' && typeof item.key === 'string' && typeof item.name === 'string';
 
-export type JiraIssue = {
-    id: string;
-    key: string;
-    fields: {
-        summary: string;
-        assignee?: JiraUser | null;
-        priority?: JiraPriority | null;
-        duedate?: string | null;
-        status?: JiraStatus | null;
-    };
-};
+const isJiraProjectsArray = (data: any): data is JiraProject[] =>
+    Array.isArray(data) && data.every(isJiraProject);
 
 type State = {
-    projects: any[];
-    project?: string | null;
+    projects: JiraProject[];
+    selectedProject?: JiraProject | null;
     issues: JiraIssue[];
     users: JiraUser[];
     loading: boolean;
     error?: string | null;
+    setSelectedProject: (project: JiraProject | null) => void;
     loadProjects: () => Promise<void>;
     loadIssues: (projectKey: string) => Promise<void>;
-    loadUsers: (projectKey: string) => Promise<void>;
+    loadUsers: (projectIdOrKey: string) => Promise<void>;
     assign: (issueKey: string, accountId: string) => Promise<void>;
     updatePriority: (issueKey: string, priority: string) => Promise<void>;
     autoAssign: (projectKey: string) => Promise<void>;
@@ -36,58 +28,69 @@ type State = {
 export const useStore = create<State>()(
     devtools((set, get) => ({
         projects: [],
-        project: null,
+        selectedProject: null,
         issues: [],
         users: [],
         loading: false,
         error: null,
 
+        setSelectedProject: (project) => set({ selectedProject: project }),
+
         loadProjects: async () => {
             set({ loading: true, error: null });
             try {
-                const projects = await api.fetchProjects();
-                set({ projects, loading: false });
+                const data = await api.fetchProjects();
+                // если api возвращает массив
+                if (isJiraProjectsArray(data)) {
+                    set({ projects: data, loading: false });
+                    return;
+                }
+                // если api возвращает объект с values
+                const arr = Array.isArray((data as any)?.values) ? (data as any).values : Array.isArray(data) ? data : [];
+                const filtered: JiraProject[] = arr
+                    .filter((p: any) => p && typeof p.id === 'string' && typeof p.key === 'string')
+                    .map((p: any) => ({ id: p.id, key: p.key, name: p.name || p.key }));
+                set({ projects: filtered, loading: false });
             } catch (e: any) {
-                set({ error: e.message || String(e), loading: false });
+                set({ error: e?.message || String(e), loading: false });
             }
         },
 
         loadIssues: async (projectKey: string) => {
-            set({ loading: true, error: null, project: projectKey });
+            set({ loading: true, error: null });
             try {
                 const res = await api.fetchIssues(projectKey);
-                const issues = res.issues ?? res;
+                const issues = (res && (res as any).issues) || [];
                 set({ issues, loading: false });
             } catch (e: any) {
-                set({ error: e.message || String(e), loading: false });
+                set({ error: e?.message || String(e), loading: false });
             }
         },
 
-        loadUsers: async (projectKey: string) => {
+        loadUsers: async (projectIdOrKey: string) => {
             set({ loading: true, error: null });
             try {
-                const users = await api.fetchProjectUsers(projectKey);
+                const users = await api.fetchProjectUsers(projectIdOrKey); // ожидает JiraUser[]
                 set({ users, loading: false });
             } catch (e: any) {
-                set({ error: e.message || String(e), loading: false });
+                set({ error: e?.message || String(e), loading: false });
             }
         },
 
         assign: async (issueKey: string, accountId: string) => {
             const prev = get().issues;
-            // оптимистичное обновление
             set({
                 issues: prev.map((i) =>
-                    i.key === issueKey
-                        ? { ...i, fields: { ...i.fields, assignee: { accountId, displayName: '...' } } }
-                        : i
+                    i.key === issueKey ? { ...i, fields: { ...i.fields, assignee: { accountId, displayName: '...' } } } : i
                 ),
             });
             try {
                 await api.assignIssue(issueKey, accountId);
-                await get().loadIssues(get().project!);
+                const current = get().selectedProject;
+                if (current?.key) {
+                    await get().loadIssues(current.key);
+                }
             } catch (e) {
-                // откат
                 set({ issues: prev });
                 throw e;
             }
@@ -96,9 +99,7 @@ export const useStore = create<State>()(
         updatePriority: async (issueKey: string, priority: string) => {
             const prev = get().issues;
             set({
-                issues: prev.map((i) =>
-                    i.key === issueKey ? { ...i, fields: { ...i.fields, priority: { name: priority } } } : i
-                ),
+                issues: prev.map((i) => (i.key === issueKey ? { ...i, fields: { ...i.fields, priority: { name: priority } } } : i)),
             });
             try {
                 await api.updatePriority(issueKey, priority);

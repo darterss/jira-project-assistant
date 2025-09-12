@@ -12,7 +12,16 @@ export default defineConfig({
         outDir: resolve(__dirname, '../apps/forge-app/resources/static/main'),
         emptyOutDir: true
     },
+    base: './',
+    esbuild: {
+        legalComments: "none"
+    },
+    assetsInclude: [],
+
+    //for docker
     server: {
-        port: 3000
-    }
+        host: '0.0.0.0',
+        port: 5173,
+    },
 });
+
