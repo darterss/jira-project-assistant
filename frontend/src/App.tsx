@@ -67,7 +67,11 @@ const App: React.FC = () => {
                     <Tab label="Team" />
                 </Tabs>
 
-                {tab === 0 && <IssuesTable issues={issues} reload={() => loadIssues(selectedProject!)} projectKey={selectedProject} />}
+                {tab === 0 && <IssuesTable
+                    loading={useStore((s) => s.loading)}
+                    issues={issues} reload={() => loadIssues(selectedProject!)}
+                    projectKey={selectedProject}
+                />}
                 {tab === 1 && <TeamTab users={users} issues={issues} />}
             </Box>
 
