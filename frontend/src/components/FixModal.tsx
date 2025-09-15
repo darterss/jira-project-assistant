@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemText, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
-import { api } from '../api';
-import { JiraUser } from '../store/useIssuesStore';
+import { api } from '../API/api';
+import { JiraUser } from '../types/types';
 
 type Props = {
     open: boolean;

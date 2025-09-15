@@ -52,7 +52,7 @@ const App: React.FC = () => {
                         onChange={(e) => setSelectedProject(String(e.target.value))}
                         sx={{ color: 'white', mr: 2, minWidth: 220 }}
                     >
-                        {projects.map((p: any) => <MenuItem key={p.key || p.id} value={p.key || p.id}>{p.name || p.key}</MenuItem>)}
+                        {projects.map((p) => <MenuItem key={p.key || p.id} value={p.key || p.id}>{p.name || p.key}</MenuItem>)}
                     </Select>
 
                     <Button variant="outlined" color="inherit" onClick={doAutoAssign} disabled={loadingAction}>

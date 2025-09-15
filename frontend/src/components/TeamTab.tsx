@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Box, List, ListItem, ListItemText, Typography, LinearProgress } from '@mui/material';
-import { JiraUser, JiraIssue } from '../store/useIssuesStore';
+import { JiraUser, JiraIssue } from '../types/types';
 
 type Props = {
     users: JiraUser[];
@@ -8,66 +8,46 @@ type Props = {
 };
 
 export const TeamTab: React.FC<Props> = ({ users, issues }) => {
-    // Считаем количество задач на каждого
-    const userCounts = useMemo(() => {
-        const counts = new Map<string, number>();
+    // Считаем количество задач на пользователя
+    const counts = useMemo(() => {
+        const map = new Map<string, number>();
         issues.forEach((iss) => {
             const a = iss.fields.assignee;
-            if (a?.accountId) counts.set(a.accountId, (counts.get(a.accountId) || 0) + 1);
-        });
-        return counts;
-    }, [issues]);
-
-    // Рассчитываем активность
-    const userActivity = useMemo(() => {
-        const activityMap = new Map<string, number>();
-        users.forEach((u) => {
-            const assignedIssues = issues.filter(
-                (iss) => iss.fields.assignee?.accountId === u.accountId
-            );
-            if (assignedIssues.length === 0) {
-                activityMap.set(u.accountId, 0);
-            } else {
-                const activeCount = assignedIssues.filter(
-                    (iss) => iss.fields.status?.name !== 'Done'
-                ).length;
-                activityMap.set(u.accountId, Math.round((activeCount / assignedIssues.length) * 100));
+            if (a?.accountId) {
+                map.set(a.accountId, (map.get(a.accountId) || 0) + 1);
             }
         });
-        return activityMap;
-    }, [users, issues]);
+        return map;
+    }, [issues]);
 
-    // Сортируем пользователей по количеству задач
-    const sortedUsers = useMemo(() => {
-        return [...users].sort(
-            (a, b) => (userCounts.get(b.accountId) || 0) - (userCounts.get(a.accountId) || 0)
-        );
-    }, [users, userCounts]);
+    // считаем активность
+    const maxAssigned = useMemo(() => {
+        return users.reduce((max, u) => Math.max(max, counts.get(u.accountId) || 0), 0);
+    }, [users, counts]);
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" sx={{ mb: 2 }}>
                 Team
             </Typography>
             <List>
-                {sortedUsers.map((u) => (
-                    <ListItem key={u.accountId} divider>
-                        <ListItemText
-                            primary={u.displayName || u.accountId}
-                            secondary={`Assigned: ${userCounts.get(u.accountId) || 0}`}
-                        />
-                        <Box sx={{ width: 120, ml: 2 }}>
-                            <Typography variant="caption" color="textSecondary">
-                                Activity: {userActivity.get(u.accountId) || 0}%
-                            </Typography>
+                {users.map((u) => {
+                    const assigned = counts.get(u.accountId) || 0;
+                    const activity = maxAssigned > 0 ? Math.round((assigned / maxAssigned) * 100) : 0;
+                    return (
+                        <ListItem key={u.accountId} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <ListItemText
+                                primary={u.displayName || u.accountId}
+                                secondary={`Assigned: ${assigned} | Activity: ${activity}%`}
+                            />
                             <LinearProgress
                                 variant="determinate"
-                                value={userActivity.get(u.accountId) || 0}
-                                sx={{ height: 10, borderRadius: 5, mt: 0.5 }}
+                                value={activity}
+                                sx={{ width: '100%', maxWidth: 300, mt: 1, borderRadius: 1 }}
                             />
-                        </Box>
-                    </ListItem>
-                ))}
+                        </ListItem>
+                    );
+                })}
             </List>
         </Box>
     );
