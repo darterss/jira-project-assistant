@@ -1,89 +1,118 @@
 import Resolver from '@forge/resolver';
-import api, { fetch } from '@forge/api';
+import { asApp, route } from '@forge/api';
+import { JiraProject, JiraUser, JiraIssue, AssignResult, AutoAssignResult } from './types';
 
 const resolver = new Resolver();
 
-async function jiraRequest(path: string, options?: RequestInit) {
-  const url = `/rest/api/3${path}`;
-console.log('url!!!!!!!!!!!!!!!!!!!!!!: ', url)
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    ...(options?.headers as Record<string, string> | undefined),
-  };
+// Получить список проектов
+resolver.define('getProjects', async (): Promise<JiraProject[]> => {
+  const res = await asApp().requestJira(route`/rest/api/3/project/search`);
+  if (!res.ok) throw new Error(`Jira API error ${res.status}: ${await res.text()}`);
 
-  const reqInit: any = {
-    ...options,
-    headers,
-  };
+  const data: { values: any[] } = await res.json();
 
-  const res = await fetch(url, reqInit);
-  return res.json();
-}
-
-
-/** === HANDLERS === */
-
-resolver.define('getProjects', async () => {
-  const logs: string[] = [];
-  logs.push('getProjects invoked!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-
-  const res = await jiraRequest('/project/search');
-  logs.push(`jira response length: ${res.values?.length || 0}`);
-
-  return { data: res.values, logs }; // логи в браузер
+  return data.values.map((project) => ({
+    id: project.id,
+    key: project.key,
+    name: project.name,
+  }));
 });
 
+// Получить задачи проекта
+resolver.define('getIssues', async ({ payload }): Promise<{ issues: JiraIssue[] }> => {
+  const { projectKey } = payload as { projectKey: string };
+  const jql = `project="${projectKey}" ORDER BY created DESC`;
 
-resolver.define('getIssues', async (req) => {
-  const { projectKey } = req.payload as { projectKey: string };
-  const jql = `project=${projectKey}`;
-  const res = await jiraRequest(
-      `/search?jql=${encodeURIComponent(jql)}&maxResults=1000&fields=summary,assignee,priority,duedate,status`
+  const res = await asApp().requestJira(
+      route`/rest/api/3/search?jql=${jql}&maxResults=1000&fields=summary,assignee,priority,duedate,status`
   );
-  return res;
+
+  if (!res.ok) throw new Error(`Jira API error ${res.status}: ${await res.text()}`);
+
+  const data: { issues: JiraIssue[] } = await res.json();
+  return data;
 });
 
-resolver.define('getProjectUsers', async (req) => {
-  const { projectKey } = req.payload as { projectKey: string };
-  return jiraRequest(`/user/assignable/search?project=${projectKey}&maxResults=50`);
-});
+// Получить пользователей проекта
+resolver.define('getProjectUsers', async ({ payload }): Promise<JiraUser[]> => {
+  const { projectKey } = payload as { projectKey: string };
 
-resolver.define('assignIssue', async (req) => {
-  const { issueKey, accountId } = req.payload as { issueKey: string; accountId: string };
-  return jiraRequest(`/issue/${issueKey}/assignee`, {
-    method: 'PUT',
-    body: JSON.stringify({ accountId }),
-  });
-});
-
-resolver.define('updatePriority', async (req) => {
-  const { issueKey, priority } = req.payload as { issueKey: string; priority: string };
-  return jiraRequest(`/issue/${issueKey}`, {
-    method: 'PUT',
-    body: JSON.stringify({ fields: { priority: { name: priority } } }),
-  });
-});
-
-resolver.define('autoAssign', async (req) => {
-  const { projectKey } = req.payload as { projectKey: string };
-
-  const issuesRes = await jiraRequest(
-      `/search?jql=${encodeURIComponent(`project=${projectKey} AND assignee IS EMPTY`)}&fields=summary,assignee&maxResults=100`
+  const res = await asApp().requestJira(
+      route`/rest/api/3/user/assignable/search?project=${projectKey}&maxResults=50`
   );
-  const issues = issuesRes.issues || [];
-  const users = await jiraRequest(`/user/assignable/search?project=${projectKey}&maxResults=50`);
+
+  if (!res.ok) throw new Error(`Jira API error ${res.status}: ${await res.text()}`);
+
+  const users: JiraUser[] = await res.json();
+  return users;
+});
+
+// Назначить задачу пользователю
+resolver.define('assignIssue', async ({ payload }): Promise<AssignResult> => {
+  const { issueKey, accountId } = payload as { issueKey: string; accountId: string };
+
+  const res = await asApp().requestJira(
+      route`/rest/api/3/issue/${issueKey}/assignee`,
+      {
+        method: 'PUT',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      }
+  );
+
+  if (!res.ok) throw new Error(`Jira API error ${res.status}: ${await res.text()}`);
+
+  return { success: true };
+});
+
+// Обновить приоритет задачи
+resolver.define('updatePriority', async ({ payload }): Promise<AssignResult> => {
+  const { issueKey, priority } = payload as { issueKey: string; priority: string };
+
+  const res = await asApp().requestJira(
+      route`/rest/api/3/issue/${issueKey}`,
+      {
+        method: 'PUT',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { priority: { name: priority } } }),
+      }
+  );
+
+  if (!res.ok) throw new Error(`Jira API error ${res.status}: ${await res.text()}`);
+
+  return { success: true };
+});
+
+// Автоматическое распределение задач
+resolver.define('autoAssign', async ({ payload }): Promise<AutoAssignResult> => {
+  const { projectKey } = payload as { projectKey: string };
+
+  const issuesRes = await asApp().requestJira(
+      route`/rest/api/3/search?jql=project=${projectKey} AND assignee IS EMPTY&fields=summary,assignee&maxResults=100`
+  );
+  if (!issuesRes.ok) throw new Error(`Jira API error ${issuesRes.status}: ${await issuesRes.text()}`);
+
+  const issuesData: { issues: JiraIssue[] } = await issuesRes.json();
+  const issues = issuesData.issues || [];
+
+  const usersRes = await asApp().requestJira(
+      route`/rest/api/3/user/assignable/search?project=${projectKey}&maxResults=50`
+  );
+  if (!usersRes.ok) throw new Error(`Jira API error ${usersRes.status}: ${await usersRes.text()}`);
+
+  const users: JiraUser[] = await usersRes.json();
   if (!users.length) return { assignedCount: 0, assignments: [] };
 
-  const assignments = [];
+  const assignments: Array<{ issueKey: string; accountId: string }> = [];
   for (const issue of issues) {
     const rand = users[Math.floor(Math.random() * users.length)];
-    await jiraRequest(`/issue/${issue.key}/assignee`, {
-      method: 'PUT',
-      body: JSON.stringify({ accountId: rand.accountId }),
-    });
+    await asApp().requestJira(
+        route`/rest/api/3/issue/${issue.key}/assignee`,
+        { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: rand.accountId }) }
+    );
     assignments.push({ issueKey: issue.key, accountId: rand.accountId });
   }
+
   return { assignedCount: assignments.length, assignments };
 });
 

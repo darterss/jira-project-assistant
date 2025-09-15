@@ -17,7 +17,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (projects && projects.length > 0 && !selectedProject) {
-            setSelectedProject(projects[0].key || projects[0].projectKey || projects[0].id);
+            setSelectedProject(projects[0].key || projects[0].id);
         }
     }, [projects]);
 

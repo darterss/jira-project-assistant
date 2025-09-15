@@ -3,6 +3,8 @@ modules:
     - key: project-assistant-ui
       title: Project Assistant
       resource: main
+      resolver:
+        function: resolver
   function:
     - key: resolver
       handler: index.handler
@@ -12,10 +14,14 @@ resources:
     path: resources/static/main # путь к React сборке
 
 permissions:
+  content:
+    styles:
+    - 'unsafe-inline'
   scopes:
     - read:jira-work
     - write:jira-work
     - manage:jira-project
+    - read:jira-user
 
 app:
   id: ari:cloud:ecosystem::app/cb1115e6-656c-48c7-a07e-0a12d4b3f332
