@@ -17,5 +17,11 @@ export default defineConfig({
         legalComments: "none"
     },
     assetsInclude: [],
+
+    //for docker
+    server: {
+        host: '0.0.0.0',
+        port: 5173,
+    },
 });
 

@@ -12,6 +12,8 @@ modules:
 resources:
   - key: main
     path: resources/static/main # путь к React сборке
+    tunnel:
+      port: 5173
 
 permissions:
   content:
