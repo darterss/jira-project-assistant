@@ -1,7 +1,5 @@
 .idea
 node_modules
 .env
-dist
-README.md
-remote-backend
 temp
+Dockerfile
